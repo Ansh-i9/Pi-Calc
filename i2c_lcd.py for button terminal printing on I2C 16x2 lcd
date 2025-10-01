@@ -1,0 +1,82 @@
+from lcd_api import LcdApi
+import utime
+
+# PCF8574 pin mapping (common)
+PIN_RS = 0x01       # P0
+PIN_RW = 0x02       # P1 (not used)
+PIN_EN = 0x04       # P2
+PIN_BACKLIGHT = 0x08  # P3
+# data pins are P4..P7 (0x10 .. 0x80)
+
+class I2cLcd(LcdApi):
+    def __init__(self, i2c, i2c_addr, num_rows, num_cols):
+        self.i2c = i2c
+        self.i2c_addr = i2c_addr
+        self.backlight = PIN_BACKLIGHT
+        utime.sleep_ms(20)
+
+        # init hardware (4-bit mode)
+        self._write_init_nibble(0x30)
+        utime.sleep_ms(5)
+        self._write_init_nibble(0x30)
+        utime.sleep_us(150)
+        self._write_init_nibble(0x30)
+        utime.sleep_us(150)
+        self._write_init_nibble(0x20)  # set 4-bit
+        utime.sleep_us(150)
+
+        super().__init__(num_rows, num_cols)
+
+        # function set: 4-bit, 2 lines, 5x8
+        self.write_cmd(0x28)
+        # display off
+        self.write_cmd(0x08)
+        # clear display
+        self.write_cmd(0x01)
+        utime.sleep_ms(2)
+        # entry mode
+        self.write_cmd(0x06)
+        # display on, cursor off, blink off
+        self.write_cmd(0x0C)
+
+    def _write(self, data):
+        self.i2c.writeto(self.i2c_addr, bytes([data | (self.backlight if self.backlight else 0)]))
+
+    def _pulse_enable(self, data):
+        self._write(data | PIN_EN)
+        utime.sleep_us(1)
+        self._write(data & ~PIN_EN)
+        utime.sleep_us(50)
+
+    def _write4bits(self, nibble_with_flags):
+        self._write(nibble_with_flags)
+        self._pulse_enable(nibble_with_flags)
+
+    def _write_init_nibble(self, val):
+        # val is full byte, we send top nibble
+        data = (val & 0xF0)
+        self._write4bits(data)
+
+    def _send(self, value, mode):
+        # send high nibble
+        high = value & 0xF0
+        low = (value << 4) & 0xF0
+        self._write4bits(high | mode)
+        self._write4bits(low  | mode)
+
+    def write_cmd(self, cmd):
+        self._send(cmd, 0)
+        utime.sleep_ms(1)
+
+    def write_data(self, data):
+        self._send(data, PIN_RS)
+        utime.sleep_us(50)
+
+    # optional: control backlight
+    def backlight_on(self):
+        self.backlight = PIN_BACKLIGHT
+        self._write(0)
+
+    def backlight_off(self):
+        self.backlight = 0
+        self._write(0)
