@@ -1,0 +1,72 @@
+from machine import Pin, I2C
+from time import sleep
+import utime
+from lcd_api import LcdApi
+from i2c_lcd import I2cLcd
+
+I2C_NUM_ROWS = 2
+I2C_NUM_COLS = 16
+
+# init I2C on GP0 (SDA) and GP1 (SCL)
+i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
+
+print("I2C scan:", i2c.scan())
+
+scan = i2c.scan()
+if len(scan) == 0:
+    print("No I2C devices found! Check wiring/VCC/GND.")
+    # still set default address to common 0x27 to let you try
+    addr = 0x27
+else:
+    addr = scan[0]  # use first found device
+    print("Using I2C addr:", hex(addr))
+
+lcd = I2cLcd(i2c, addr, I2C_NUM_ROWS, I2C_NUM_COLS)
+
+# --- Buttons setup ---
+button1 = Pin(16, Pin.IN, Pin.PULL_UP)
+button2 = Pin(17, Pin.IN, Pin.PULL_UP)
+button3 = Pin(18, Pin.IN, Pin.PULL_UP)
+button4 = Pin(19, Pin.IN, Pin.PULL_UP)
+
+lcd.putstr("Ready...\nPress Button")
+
+def wait_release(pin):
+    # small wait until user releases button
+    while pin.value() == 0:
+        sleep(0.01)
+
+while True:
+    if button1.value() == 0:
+        sleep(0.05)  # debounce
+        if button1.value() == 0:
+            lcd.clear()
+            lcd.putstr(" 1 ")
+            print("1")
+            wait_release(button1)
+
+    if button2.value() == 0:
+        sleep(0.05)
+        if button2.value() == 0:
+            lcd.clear()
+            lcd.putstr(" 2 ")
+            print("2")
+            wait_release(button2)
+
+    if button3.value() == 0:
+        sleep(0.05)
+        if button3.value() == 0:
+            lcd.clear()
+            lcd.putstr(" 3 ")
+            print("3")
+            wait_release(button3)
+
+    if button4.value() == 0:
+        sleep(0.05)
+        if button4.value() == 0:
+            lcd.clear()
+            lcd.putstr(" 4 ")
+            print("4")
+            wait_release(button4)
+
+    sleep(0.01)
